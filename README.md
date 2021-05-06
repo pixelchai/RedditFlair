@@ -20,6 +20,17 @@ cd RedditFlair
 python3 -m pip install -r requirements.txt
 ```
 
+### Authorisation
+You will need to authorise this script to work with Reddit. It's fine, it takes like 10 seconds.
+1. Go to https://www.reddit.com/prefs/apps, scroll to the bottom and click on "are you a developer? create an app..."
+2. Select 'installed app'
+3. Give it a name -- something like 'flair'
+4. Set the redirect url to: http://localhost:8298
+5. Click 'create app'
+6. Reddit will give you a code, this is your `client_id`
+7. Edit the `auth.json` file in this repo and paste into the `client_id` field
+8. As per the Reddit API guidelines, enter an identifiable string in the `user_agent` field -- something like `RedditFlair instance by u/<your username> https://git.io/J3PPe`
+
 ### Launch
 ```
 python3 main.py
