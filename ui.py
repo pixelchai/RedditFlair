@@ -32,6 +32,8 @@ class CanvasWidget(QWidget):
         try:
             self._pixmap = QtGui.QPixmap.fromImage(qim.copy())
             self._recalc_im()
+        except ZeroDivisionError:
+            raise
         except:
             traceback.print_exc()
             raise
@@ -335,9 +337,11 @@ class MainWindow(QMainWindow):
 
         try:
             cur_submission_loader = self.post_list.cur()
-            cur_submission_loader.shown = False
             if cur_submission_loader is not None:
+                cur_submission_loader.shown = False
                 cur_submission_loader.disconnect()
+        except TypeError:
+            pass
         except:
             traceback.print_exc()
 
