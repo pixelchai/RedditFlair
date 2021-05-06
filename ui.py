@@ -20,7 +20,11 @@ class ConfigToggleAction(QAction):
         self.triggered.connect(self._action_triggered)
 
     def _get_value_from_config(self):
-        return core.config.get(self._config_key, self._default)
+        try:
+            return core.config[self._config_key]
+        except KeyError:
+            core.config.set(self._config_key, self._default)
+            return self._default
 
     def _action_triggered(self):
         core.config.set(self._config_key, not self._get_value_from_config())
@@ -283,6 +287,7 @@ class MainWindow(QMainWindow):
 
         # actions
         self.menu_options.addAction(ConfigToggleAction("Background", "background", False, self))
+        self.menu_options.addAction(ConfigToggleAction("Hide Seen", "hide_seen", False, self))
 
         # signal connecting + shortcuts
         self._skip_callback = self._btn_next_clicked
@@ -329,20 +334,26 @@ class MainWindow(QMainWindow):
             subreddit,
             flair
         ):
-            if not submission.is_self and submission.media is None:
-                # maybe do extra filtering here later
+            # filter out non-image posts
+            if submission.is_self or submission.media is not None:
+                continue
 
-                # instantiate and start SubmissionLoader thread
-                submission_loader = SubmissionLoader(submission, None)
-                thread = QThread()
-                submission_loader.moveToThread(thread)
-                thread.started.connect(submission_loader.load)
+            # filter out seen if hide_seen option is checked
+            if core.config["hide_seen"]:
+                if submission.id in core.config.get("seen_ids", []):
+                    continue
 
-                submission_loader.done.connect(lambda: _handle_thread_termination(thread, submission_loader))
+            # instantiate and start SubmissionLoader thread
+            submission_loader = SubmissionLoader(submission, None)
+            thread = QThread()
+            submission_loader.moveToThread(thread)
+            thread.started.connect(submission_loader.load)
 
-                thread.start()
-                self._threads.append(thread)
-                yield submission_loader
+            submission_loader.done.connect(lambda: _handle_thread_termination(thread, submission_loader))
+
+            thread.start()
+            self._threads.append(thread)
+            yield submission_loader
 
     def _btn_go_clicked(self):
         self.post_list.set_generator(self._get_generator())
@@ -376,8 +387,15 @@ class MainWindow(QMainWindow):
             traceback.print_exc()
 
         submission_loader = get_submission_loader_func()
-        submission_loader.shown = True
         if submission_loader is not None:
+            submission_loader.shown = True
+
+            # update seen_ids
+            seen_ids = core.config.get("seen_ids", [])
+            if submission_loader.submission.id not in seen_ids:
+                seen_ids.append(submission_loader.submission.id)
+            core.config.set("seen_ids", seen_ids)
+
             self._update_im(submission_loader.im)
             submission_loader.loaded.connect(self._update_im)
 

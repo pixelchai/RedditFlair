@@ -1,2 +1,0 @@
-# todo:
-- storing and skipping previously viewed posts
