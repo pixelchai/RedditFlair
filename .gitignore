@@ -1,2 +1,4 @@
 .idea/
 dev.py
+auth.json
+config.json

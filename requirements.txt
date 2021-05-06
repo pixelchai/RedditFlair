@@ -1,2 +1,4 @@
 praw
 psaw
+pyside2
+qtpy
