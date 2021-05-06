@@ -89,6 +89,18 @@ class CanvasWidget(QWidget):
         except:
             traceback.print_exc()
 
+    def mousePressEvent(self, event):
+        # https://doc.qt.io/qt-5/dnd.html#dragging
+        if event.button() == Qt.LeftButton:
+            drag = QtGui.QDrag(self)
+            mime_data = QtCore.QMimeData()
+
+            mime_data.setImageData(self._pixmap)
+            drag.setMimeData(mime_data)
+
+            drag.exec_()
+
+
 class PostList:
     def __init__(self, gen=None, prefetch=5):
         self._prev = collections.deque(maxlen=50)
