@@ -178,20 +178,18 @@ class MainWindow(QMainWindow):
 
         self.central_layout.addWidget(self.panel_top)
 
-        # self.panel_centre = QWidget(self.central_widget)
-        # self.layout_centre = QVBoxLayout(self.panel_centre)
-        #
-        # self.label_title = QLabel(self.panel_centre, text="TITLE HERE")
-        # sizePolicy.setHeightForWidth(self.label_title.sizePolicy().hasHeightForWidth())
-        # self.label_title.setSizePolicy(sizePolicy)
-        # self.layout_centre.addWidget(self.label_title)
-        #
-        # self.canvas = QWidget(self.panel_centre)
-        # self.layout_centre.addWidget(self.canvas)
-        #
-        # self.central_layout.addWidget(self.panel_centre)
-        self.canvas = CanvasWidget(self.central_widget)
-        self.central_layout.addWidget(self.canvas)
+        self.panel_centre = QWidget(self.central_widget)
+        self.layout_centre = QVBoxLayout(self.panel_centre)
+
+        self.label_title = QLabel(self.panel_centre, text="TITLE HERE")
+        sizePolicy.setHeightForWidth(self.label_title.sizePolicy().hasHeightForWidth())
+        self.label_title.setSizePolicy(sizePolicy)
+        self.layout_centre.addWidget(self.label_title)
+
+        self.canvas = CanvasWidget(self.panel_centre)
+        self.layout_centre.addWidget(self.canvas)
+
+        self.central_layout.addWidget(self.panel_centre)
 
         self.panel_bottom = QWidget(self.central_widget)
         sizePolicy.setHeightForWidth(self.panel_bottom.sizePolicy().hasHeightForWidth())
@@ -224,19 +222,24 @@ class MainWindow(QMainWindow):
         # need to keep reference to threads otherwise will get GC'd
         self._threads = collections.deque(maxlen=20)
 
-        # test:
-        # url = 'https://source.unsplash.com/random'
-        # data = requests.get(url, stream=True).content
-        #
-        # image = QtGui.QImage()
-        # image.loadFromData(data)
-        #
-        # self.canvas.set_image(image)
+        # load config
+        try:
+            self.edit_subreddit.setText(core.config["prev_subreddit"])
+            self.edit_flair.setText(core.config["prev_flair"])
+            self.btn_go.click()
+        except:
+            pass
 
     def _get_generator(self):
+        subreddit = self.edit_subreddit.text()
+        flair = self.edit_flair.text()
+
+        core.config["prev_subreddit"] = subreddit
+        core.config["prev_flair"] = flair
+
         for submission in self.api.search(
-            self.edit_subreddit.text(),
-            self.edit_flair.text()
+            subreddit,
+            flair
         ):
             if not submission.is_self and submission.media is None:
                 # maybe do extra filtering here later
@@ -267,4 +270,7 @@ class MainWindow(QMainWindow):
         if submission_loader is not None:
             self._update_im(submission_loader.im)
             submission_loader.loaded.connect(self._update_im)
+
+            self.label_title.setText(submission_loader.submission.title)
+            self.label_no_display.setText(f"#{self.post_list.get_no():05d}")
             print("next done!")
