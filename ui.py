@@ -4,6 +4,7 @@ from qtpy.QtWidgets import *
 import collections
 import requests
 import core
+import traceback
 
 class CanvasWidget(QWidget):
     def __init__(self, parent, *args, **kwargs):
@@ -26,8 +27,12 @@ class CanvasWidget(QWidget):
         self._off_x, self._off_y = cw/2 - w*self._scale/2, ch/2 - h*self._scale/2
 
     def set_image(self, qim):
-        self._pixmap = QtGui.QPixmap.fromImage(qim.copy())
-        self._recalc_im()
+        try:
+            self._pixmap = QtGui.QPixmap.fromImage(qim.copy())
+            self._recalc_im()
+        except:
+            traceback.print_exc()
+            raise
         self.repaint()
 
     def clear_image(self):
@@ -45,15 +50,18 @@ class CanvasWidget(QWidget):
         brush = QtGui.QBrush(Qt.black, Qt.Dense4Pattern)
         painter.fillRect(0, 0, self.width(), self.height(), brush)
 
-        # paint pixmap
-        if self._pixmap is not None:
-            painter.drawPixmap(
-                self._off_x,
-                self._off_y,
-                self._pixmap.width() * self._scale,
-                self._pixmap.height() * self._scale,
-                self._pixmap
-            )
+        try:
+            # paint pixmap
+            if self._pixmap is not None:
+                painter.drawPixmap(
+                    self._off_x,
+                    self._off_y,
+                    self._pixmap.width() * self._scale,
+                    self._pixmap.height() * self._scale,
+                    self._pixmap
+                )
+        except:
+            traceback.print_exc()
 
 class PostList:
     def __init__(self, gen=None, prefetch=5):
@@ -114,6 +122,7 @@ class SubmissionLoader(QObject):
     Worker class for lazily loading submission images
     """
     loaded = Signal(QtGui.QImage)
+    done = Signal()
 
     def __init__(self, submission, parent, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
@@ -124,12 +133,16 @@ class SubmissionLoader(QObject):
     def _load_url(self, url):
         data = requests.get(url, stream=True).content
 
-        image = QtGui.QImage()
-        image.loadFromData(data)
-        self.im = image
+        try:
+            image = QtGui.QImage()
+            image.loadFromData(data)
+            self.im = image
 
-        print(f"{self.submission.id}: Loaded: {url}")
-        self.loaded.emit(self.im)
+            print(f"{self.submission.id}: Loaded: {url}")
+            self.loaded.emit(self.im)
+        except:
+            print(f"ERROR loading: {self.submission.id}: Loaded: {url}")
+            traceback.print_exc()
 
     def load(self):
         try:
@@ -142,6 +155,7 @@ class SubmissionLoader(QObject):
             pass  # continue to below
 
         self._load_url(self.submission.url)
+        self.done.emit()
 
 class MainWindow(QMainWindow):
     def __init__(self, parent=None, *args, **kwargs):
@@ -220,7 +234,7 @@ class MainWindow(QMainWindow):
         self.btn_next.clicked.connect(self._btn_next_clicked)
 
         # need to keep reference to threads otherwise will get GC'd
-        self._threads = collections.deque(maxlen=20)
+        self._threads = []
 
         # load config
         try:
@@ -231,6 +245,14 @@ class MainWindow(QMainWindow):
             pass
 
     def _get_generator(self):
+        def _handle_thread_termination(thread):
+            try:
+                thread.quit()
+                thread.wait()
+                thread.deleteLater()
+            except RuntimeError:
+                pass
+
         subreddit = self.edit_subreddit.text()
         flair = self.edit_flair.text()
 
@@ -249,6 +271,9 @@ class MainWindow(QMainWindow):
                 thread = QThread()
                 submission_loader.moveToThread(thread)
                 thread.started.connect(submission_loader.load)
+
+                submission_loader.done.connect(lambda: _handle_thread_termination(thread))
+
                 thread.start()
                 self._threads.append(thread)
                 yield submission_loader
@@ -261,10 +286,15 @@ class MainWindow(QMainWindow):
 
     def _update_im(self, im):
         if im is not None:
-            self.canvas.set_image(im)
-            print("updated canvas im!")
+            try:
+                self.canvas.set_image(im)
+                print("updated canvas im!")
+            except:
+                self._btn_next_clicked()
+                print("skipped due to error!")
 
     def _btn_next_clicked(self):
+        self.canvas.clear_image()
         submission_loader = self.post_list.next()
 
         if submission_loader is not None:
