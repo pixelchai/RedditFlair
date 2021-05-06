@@ -314,15 +314,21 @@ class MainWindow(QMainWindow):
                 self.canvas.set_image(im)
                 print("updated canvas im!")
             except:
-                self._skip_callback()
-                print("skipped due to error!")
+                try:
+                    self._skip_callback()
+                    print("skipped due to error!")
+                except:
+                    traceback.print_exc()
 
     def _load_from_submission_loader(self, get_submission_loader_func):
         self.canvas.clear_image()
 
-        cur_submission_loader = self.post_list.cur()
-        if cur_submission_loader is not None:
-            cur_submission_loader.disconnect()
+        try:
+            cur_submission_loader = self.post_list.cur()
+            if cur_submission_loader is not None:
+                cur_submission_loader.disconnect()
+        except:
+            traceback.print_exc()
 
         submission_loader = get_submission_loader_func()
         if submission_loader is not None:
