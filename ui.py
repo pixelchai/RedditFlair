@@ -8,6 +8,23 @@ import traceback
 import webbrowser
 import time
 
+class ConfigToggleAction(QAction):
+    def __init__(self, text, config_key, default, parent):
+        super().__init__(parent, text=text)
+        self._config_key = config_key
+        self._default = default
+
+        self.setCheckable(True)
+        self.setChecked(self._get_value_from_config())
+
+        self.triggered.connect(self._action_triggered)
+
+    def _get_value_from_config(self):
+        return core.config.get(self._config_key, self._default)
+
+    def _action_triggered(self):
+        core.config.set(self._config_key, not self._get_value_from_config())
+
 class CanvasWidget(QWidget):
     def __init__(self, parent, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
@@ -190,6 +207,14 @@ class MainWindow(QMainWindow):
         self.post_list = PostList(prefetch=core.config.get("prefetch", 5))
 
         # region widgets
+        self.menu_bar = QMenuBar(self)
+
+        self.menu_options = QMenu(self.menu_bar)
+        self.menu_options.setTitle("&Options")
+        self.menu_bar.addAction(self.menu_options.menuAction())
+
+        self.setMenuBar(self.menu_bar)
+
         self.central_widget = QWidget(self)
         self.central_layout = QVBoxLayout(self.central_widget)
 
@@ -256,6 +281,10 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.central_widget)
         # endregion
 
+        # actions
+        self.menu_options.addAction(ConfigToggleAction("Background", "background", False, self))
+
+        # signal connecting + shortcuts
         self._skip_callback = self._btn_next_clicked
 
         self.btn_go.clicked.connect(self._btn_go_clicked)
