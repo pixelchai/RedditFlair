@@ -6,6 +6,7 @@ import requests
 import core
 import traceback
 import webbrowser
+import time
 
 class CanvasWidget(QWidget):
     def __init__(self, parent, *args, **kwargs):
@@ -131,6 +132,8 @@ class SubmissionLoader(QObject):
         self.submission = submission
         self.im = None
         self._title = None
+        self.shown = False
+        self.quit_flag = False
 
     @property
     def title(self):
@@ -159,14 +162,20 @@ class SubmissionLoader(QObject):
         except:
             pass
 
+        no_preview_flag = True
         try:
-            for resolution in self.submission.preview["images"][0]["resolutions"]:
+            for resolution in self.submission.preview["images"][0]["resolutions"][:1]:
                 try:
                     self._load_url(resolution["url"])
+                    no_preview_flag = False
                 except:
                     pass
-        except AttributeError:
+        except:
             pass  # continue to below
+
+        if not no_preview_flag:
+            while not self.shown and not self.quit_flag:
+                time.sleep(0.1)
 
         self._load_url(self.submission.url)
         self.done.emit()
@@ -269,8 +278,9 @@ class MainWindow(QMainWindow):
             pass
 
     def _get_generator(self):
-        def _handle_thread_termination(thread):
+        def _handle_thread_termination(thread, submission_loader):
             try:
+                submission_loader.quit_flag = True
                 thread.quit()
                 thread.wait()
                 thread.deleteLater()
@@ -296,7 +306,7 @@ class MainWindow(QMainWindow):
                 submission_loader.moveToThread(thread)
                 thread.started.connect(submission_loader.load)
 
-                submission_loader.done.connect(lambda: _handle_thread_termination(thread))
+                submission_loader.done.connect(lambda: _handle_thread_termination(thread, submission_loader))
 
                 thread.start()
                 self._threads.append(thread)
@@ -325,12 +335,14 @@ class MainWindow(QMainWindow):
 
         try:
             cur_submission_loader = self.post_list.cur()
+            cur_submission_loader.shown = False
             if cur_submission_loader is not None:
                 cur_submission_loader.disconnect()
         except:
             traceback.print_exc()
 
         submission_loader = get_submission_loader_func()
+        submission_loader.shown = True
         if submission_loader is not None:
             self._update_im(submission_loader.im)
             submission_loader.loaded.connect(self._update_im)
