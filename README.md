@@ -8,7 +8,7 @@ is to use a 3rd party api, such as the [pushshift API](https://github.com/pushsh
 
 While gallery browsers for Reddit do exist, I couldn't find any that were not subject to this limitation because they didn't use 3rd party APIs. Hence, RedditFlair
 
-<center><img src="res/scrot.png"></center>
+<img src="res/scrot.png">
 
 # Usage
 ### Downloading/Installing
