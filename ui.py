@@ -3,6 +3,7 @@ from qtpy.QtCore import Qt, QTimer
 from qtpy.QtWidgets import *
 import collections
 import requests
+import core
 
 class CanvasWidget(QWidget):
     def __init__(self, parent, *args, **kwargs):
@@ -93,10 +94,54 @@ class PostList:
     def get_no(self) -> int:
         return self._no
 
+    def clear(self):
+        self._cur = None
+        self._prev.clear()
+        self._next.clear()
+        self._no = 0
+
+    def set_generator(self, gen):
+        self.clear()
+        self._gen = gen
+
+class SubmissionLoader(QtCore.QObject):
+    """
+    Worker class for lazily loading submission images
+    """
+    loaded = QtCore.Signal(QtGui.QImage)
+
+    def __init__(self, submission, parent, *args, **kwargs):
+        super().__init__(parent, *args, **kwargs)
+
+        self.submission = submission
+        self.im = None
+        self.load()
+
+    def _load_url(self, url):
+        data = requests.get(url, stream=True).content
+
+        image = QtGui.QImage()
+        image.loadFromData(data)
+        self.im = image
+        self.loaded.emit(self.im)
+
+    def load(self):
+        try:
+            for resolution in self.submission.preview["images"][0]["resolutions"]:
+                try:
+                    self._load_url(resolution["url"])
+                except:
+                    pass
+        except AttributeError:
+            pass  # continue to below
+
+        self._load_url(self.submission.url)
+
 class MainWindow(QMainWindow):
     def __init__(self, parent=None, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
-
+        self.api = core.Api()
+        self.post_list = PostList()
 
         # region widgets
         self.central_widget = QWidget(self)
@@ -167,6 +212,9 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.central_widget)
         # endregion
 
+        self.btn_go.clicked.connect(self._btn_go_clicked)
+        self.btn_next.clicked.connect(self._btn_go_clicked)
+
         # test:
         url = 'https://source.unsplash.com/random'
         data = requests.get(url, stream=True).content
@@ -175,3 +223,18 @@ class MainWindow(QMainWindow):
         image.loadFromData(data)
 
         self.canvas.set_image(image)
+
+    def _get_generator(self):
+        for submission in self.api.search(
+            self.edit_subreddit.text(),
+            self.edit_flair.text()
+        ):
+            if not submission.is_self and submission.media is None:
+                # maybe do extra filtering here later
+                yield SubmissionLoader(submission, self)
+
+    def _btn_go_clicked(self):
+        self.post_list.set_generator(self._get_generator())
+
+    def _btn_next_clicked(self):
+        self.post_list.next()
