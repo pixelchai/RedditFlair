@@ -1,6 +1,7 @@
 from qtpy import QtGui, QtCore
 from qtpy.QtCore import Qt, QTimer
 from qtpy.QtWidgets import *
+import collections
 import requests
 
 class CanvasWidget(QWidget):
@@ -48,9 +49,54 @@ class CanvasWidget(QWidget):
                 self._pixmap
             )
 
+class PostList:
+    def __init__(self, gen=None, prefetch=5):
+        self._prev = collections.deque(maxlen=5)
+        self._next = collections.deque()
+        self._cur = None
+
+        self._gen = gen
+        self.prefetch = prefetch
+
+        self._no = 0
+
+    def append(self, obj):
+        self._next.append(obj)
+
+    def next_count(self):
+        return len(self._next)
+
+    def next(self):
+        if self._gen is not None:
+            while self.next_count() < self.prefetch:
+                self.append(next(self._gen))
+
+        # raises IndexError if len(self._next) <= 0
+        self._prev.append(self._cur)
+        self._cur = self._next.popleft()
+        self._no += 1
+        return self._cur
+
+    def prev_count(self):
+        return len(self._prev)
+
+    def prev(self):
+        # raises IndexError if len(self._prev) <= 0
+        self._next.appendleft(self._cur)
+        self._cur = self._prev.pop()
+        self._no -= 1
+        return self._cur
+
+    def cur(self):
+        return self._cur
+
+    def get_no(self) -> int:
+        return self._no
+
 class MainWindow(QMainWindow):
     def __init__(self, parent=None, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
+
 
         # region widgets
         self.central_widget = QWidget(self)
