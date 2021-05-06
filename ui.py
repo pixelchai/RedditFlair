@@ -1,5 +1,5 @@
 from qtpy import QtGui, QtCore
-from qtpy.QtCore import Qt, QTimer
+from qtpy.QtCore import Qt, QTimer, QObject, Signal, QThread
 from qtpy.QtWidgets import *
 import collections
 import requests
@@ -28,6 +28,11 @@ class CanvasWidget(QWidget):
     def set_image(self, qim):
         self._pixmap = QtGui.QPixmap.fromImage(qim.copy())
         self._recalc_im()
+        self.repaint()
+
+    def clear_image(self):
+        self._pixmap = None
+        self.repaint()
 
     def resizeEvent(self, event):
         self._recalc_im()
@@ -104,18 +109,17 @@ class PostList:
         self.clear()
         self._gen = gen
 
-class SubmissionLoader(QtCore.QObject):
+class SubmissionLoader(QObject):
     """
     Worker class for lazily loading submission images
     """
-    loaded = QtCore.Signal(QtGui.QImage)
+    loaded = Signal(QtGui.QImage)
 
     def __init__(self, submission, parent, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
 
         self.submission = submission
         self.im = None
-        self.load()
 
     def _load_url(self, url):
         data = requests.get(url, stream=True).content
@@ -123,6 +127,8 @@ class SubmissionLoader(QtCore.QObject):
         image = QtGui.QImage()
         image.loadFromData(data)
         self.im = image
+
+        print(f"{self.submission.id}: Loaded: {url}")
         self.loaded.emit(self.im)
 
     def load(self):
@@ -213,16 +219,19 @@ class MainWindow(QMainWindow):
         # endregion
 
         self.btn_go.clicked.connect(self._btn_go_clicked)
-        self.btn_next.clicked.connect(self._btn_go_clicked)
+        self.btn_next.clicked.connect(self._btn_next_clicked)
+
+        # need to keep reference to threads otherwise will get GC'd
+        self._threads = collections.deque(maxlen=20)
 
         # test:
-        url = 'https://source.unsplash.com/random'
-        data = requests.get(url, stream=True).content
-
-        image = QtGui.QImage()
-        image.loadFromData(data)
-
-        self.canvas.set_image(image)
+        # url = 'https://source.unsplash.com/random'
+        # data = requests.get(url, stream=True).content
+        #
+        # image = QtGui.QImage()
+        # image.loadFromData(data)
+        #
+        # self.canvas.set_image(image)
 
     def _get_generator(self):
         for submission in self.api.search(
@@ -231,10 +240,31 @@ class MainWindow(QMainWindow):
         ):
             if not submission.is_self and submission.media is None:
                 # maybe do extra filtering here later
-                yield SubmissionLoader(submission, self)
+
+                # instantiate and start SubmissionLoader thread
+                submission_loader = SubmissionLoader(submission, None)
+                thread = QThread()
+                submission_loader.moveToThread(thread)
+                thread.started.connect(submission_loader.load)
+                thread.start()
+                self._threads.append(thread)
+                yield submission_loader
 
     def _btn_go_clicked(self):
         self.post_list.set_generator(self._get_generator())
+        self.canvas.clear_image()
+        print("updated generator!")
+        self._btn_next_clicked()
+
+    def _update_im(self, im):
+        if im is not None:
+            self.canvas.set_image(im)
+            print("updated canvas im!")
 
     def _btn_next_clicked(self):
-        self.post_list.next()
+        submission_loader = self.post_list.next()
+
+        if submission_loader is not None:
+            self._update_im(submission_loader.im)
+            submission_loader.loaded.connect(self._update_im)
+            print("next done!")
