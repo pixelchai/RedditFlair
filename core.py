@@ -14,7 +14,10 @@ class Api:
 
     def search(self, subreddit, flair):
         for submission in self._psaw.search_submissions(subreddit=subreddit):
-            if submission.link_flair_text == flair:
+            if flair is not None and len(flair.strip()) > 0:
+                if submission.link_flair_text == flair:
+                    yield submission
+            else:
                 yield submission
 
 class Config:

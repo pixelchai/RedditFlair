@@ -5,6 +5,7 @@ import collections
 import requests
 import core
 import traceback
+import webbrowser
 
 class CanvasWidget(QWidget):
     def __init__(self, parent, *args, **kwargs):
@@ -65,7 +66,7 @@ class CanvasWidget(QWidget):
 
 class PostList:
     def __init__(self, gen=None, prefetch=5):
-        self._prev = collections.deque(maxlen=5)
+        self._prev = collections.deque(maxlen=50)
         self._next = collections.deque()
         self._cur = None
 
@@ -129,6 +130,14 @@ class SubmissionLoader(QObject):
 
         self.submission = submission
         self.im = None
+        self._title = None
+
+    @property
+    def title(self):
+        if self._title is not None:
+            return self._title
+        else:
+            return self.submission.title
 
     def _load_url(self, url):
         data = requests.get(url, stream=True).content
@@ -146,6 +155,11 @@ class SubmissionLoader(QObject):
 
     def load(self):
         try:
+            self._title = self.submission.title
+        except:
+            pass
+
+        try:
             for resolution in self.submission.preview["images"][0]["resolutions"]:
                 try:
                     self._load_url(resolution["url"])
@@ -161,7 +175,7 @@ class MainWindow(QMainWindow):
     def __init__(self, parent=None, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.api = core.Api()
-        self.post_list = PostList()
+        self.post_list = PostList(prefetch=core.config.get("prefetch", 5))
 
         # region widgets
         self.central_widget = QWidget(self)
@@ -230,8 +244,18 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.central_widget)
         # endregion
 
+        self._skip_callback = self._btn_next_clicked
+
         self.btn_go.clicked.connect(self._btn_go_clicked)
         self.btn_next.clicked.connect(self._btn_next_clicked)
+        self.btn_prev.clicked.connect(self._btn_prev_clicked)
+        self.btn_external.clicked.connect(self._btn_external_clicked)
+
+        QShortcut(QtGui.QKeySequence("D"), self, lambda: self._btn_next_clicked())
+        QShortcut(QtGui.QKeySequence("A"), self, lambda: self._btn_prev_clicked())
+        QShortcut(QtGui.QKeySequence("X"), self, lambda: self._btn_external_clicked())
+
+        self.btn_next.setFocus()
 
         # need to keep reference to threads otherwise will get GC'd
         self._threads = []
@@ -290,17 +314,34 @@ class MainWindow(QMainWindow):
                 self.canvas.set_image(im)
                 print("updated canvas im!")
             except:
-                self._btn_next_clicked()
+                self._skip_callback()
                 print("skipped due to error!")
 
-    def _btn_next_clicked(self):
+    def _load_from_submission_loader(self, get_submission_loader_func):
         self.canvas.clear_image()
-        submission_loader = self.post_list.next()
 
+        cur_submission_loader = self.post_list.cur()
+        if cur_submission_loader is not None:
+            cur_submission_loader.disconnect()
+
+        submission_loader = get_submission_loader_func()
         if submission_loader is not None:
             self._update_im(submission_loader.im)
             submission_loader.loaded.connect(self._update_im)
 
-            self.label_title.setText(submission_loader.submission.title)
+            self.label_title.setText(submission_loader.title)
             self.label_no_display.setText(f"#{self.post_list.get_no():05d}")
-            print("next done!")
+
+    def _btn_next_clicked(self):
+        self._skip_callback = self._btn_next_clicked
+        self._load_from_submission_loader(self.post_list.next)
+
+    def _btn_prev_clicked(self):
+        self._skip_callback = self._btn_prev_clicked
+
+        if self.post_list.prev_count() > 0:
+            self._load_from_submission_loader(self.post_list.prev)
+
+    def _btn_external_clicked(self):
+        submission_loader = self.post_list.cur()
+        webbrowser.open(submission_loader.submission.shortlink)
