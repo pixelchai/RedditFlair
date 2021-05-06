@@ -3,4 +3,5 @@ dev.py
 notes.txt
 
 auth.json
+auth.dev.json
 config.json

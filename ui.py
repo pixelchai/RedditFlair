@@ -51,8 +51,9 @@ class CanvasWidget(QWidget):
         painter = QtGui.QPainter(self)
 
         # paint background
-        brush = QtGui.QBrush(Qt.black, Qt.Dense4Pattern)
-        painter.fillRect(0, 0, self.width(), self.height(), brush)
+        if core.config.get("background", False):
+            brush = QtGui.QBrush(Qt.black, Qt.Dense4Pattern)
+            painter.fillRect(0, 0, self.width(), self.height(), brush)
 
         try:
             # paint pixmap
