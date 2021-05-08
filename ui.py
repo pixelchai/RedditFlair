@@ -262,10 +262,24 @@ class MainWindow(QMainWindow):
         self.panel_centre = QWidget(self.central_widget)
         self.layout_centre = QVBoxLayout(self.panel_centre)
 
+        self.panel_centre_top = QWidget(self.panel_centre)
+        self.layout_centre_top = QHBoxLayout(self.panel_centre_top)
+        self.layout_centre_top.setContentsMargins(0, 0, 0, 0)
+
         self.label_title = QLabel(self.panel_centre, text="TITLE HERE")
-        sizePolicy.setHeightForWidth(self.label_title.sizePolicy().hasHeightForWidth())
-        self.label_title.setSizePolicy(sizePolicy)
-        self.layout_centre.addWidget(self.label_title)
+        self.layout_centre_top.addWidget(self.label_title)
+
+        self.label_score = QLabel(self.panel_centre, text="5.3k")
+        score_size_policy = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        score_size_policy.setHorizontalStretch(0)
+        score_size_policy.setVerticalStretch(0)
+        score_size_policy.setHeightForWidth(self.label_score.sizePolicy().hasHeightForWidth())
+        self.label_score.setSizePolicy(score_size_policy)
+        self.layout_centre_top.addWidget(self.label_score)
+
+        sizePolicy.setHeightForWidth(self.panel_centre_top.sizePolicy().hasHeightForWidth())
+        self.panel_centre_top.setSizePolicy(sizePolicy)
+        self.layout_centre.addWidget(self.panel_centre_top)
 
         self.canvas = CanvasWidget(self.panel_centre)
         self.layout_centre.addWidget(self.canvas)
@@ -412,6 +426,7 @@ class MainWindow(QMainWindow):
             submission_loader.loaded.connect(self._update_im)
 
             self.label_title.setText(submission_loader.title)
+            self.label_score.setText(core.human_number(submission_loader.submission.score))
             self.label_no_display.setText(f"#{self.post_list.get_no():05d}")
 
     def _btn_next_clicked(self):

@@ -1,5 +1,6 @@
 import praw
 import json
+import math
 import os
 from psaw import PushshiftAPI
 
@@ -51,3 +52,26 @@ class Config:
         self[key] = value
 
 config: Config = Config("config.json")
+
+
+def human_number(num):
+    """
+    return human-readable version of number. E.g: 30.4k
+    """
+    # https://gist.github.com/pixelzery/eace0b100a381e7cf724612b7309a9d2
+    if num == 0:
+        return "0"
+    elif num < 0:
+        return "-" + human_number(-num)
+
+    suffixes = ['', 'k', 'm', 'b', 't']
+    suf_index = math.floor(math.log(num, 1000))
+    big = (1000 ** suf_index)
+
+    ret = ''
+    ret += str(num // big)
+    decimal_part = round((num % big) / (big / 10))
+    if decimal_part > 0:
+        ret += '.' + str(decimal_part)
+    ret += suffixes[suf_index] if suf_index < len(suffixes) else ''
+    return ret
