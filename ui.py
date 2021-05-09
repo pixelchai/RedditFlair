@@ -378,10 +378,32 @@ class MainWindow(QMainWindow):
         core.config["prev_flair"] = flair
         core.config["prev_score"] = score
 
-        for submission in self.api.search(
-            subreddit,
-            flair
-        ):
+        def _raw_generator():
+            if core.config.get("hide_seen", False) and score > 0:
+                # fancier and faster score querying by querying the pushshift API for score directly
+                # however, when filtering by score, the API only gives results >2months ago*
+                # therefore, score filter client-side for the first 2 months, then use server-side filtering
+                # and combine the two generators
+                # however since I can't be sure about the precise value of *, I should provide some overlap
+                # this is fine though if hide_seen, since duplicates will be filtered out anyway, otherwise
+                # there will be duplicates.
+                # Therefore, the fancier score querying is only available if hide_seen
+
+                cur_timestamp = time.time()
+
+                for submission in self.api.search(subreddit, flair):
+                    if cur_timestamp - submission.created < 60 * 60 * 24 * 30 * 3:  # approx 3 months
+                        yield submission
+                    else:
+                        break
+
+                for submission in self.api.search(subreddit, flair, score=f">{score}"):
+                    yield submission
+            else:
+                for submission in self.api.search(subreddit, flair):
+                    yield submission
+
+        for submission in _raw_generator():
             # filter out non-image posts
             if submission.is_self or submission.media is not None:
                 continue
