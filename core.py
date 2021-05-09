@@ -6,15 +6,15 @@ from psaw import PushshiftAPI
 
 class Api:
     def __init__(self):
-        self._praw = praw.Reddit(client_secret=None, **self._get_auth())
-        self._psaw = PushshiftAPI(self._praw)
+        self.praw = praw.Reddit(client_secret=None, **self._get_auth())
+        self.psaw = PushshiftAPI(self.praw)
 
     def _get_auth(self):
         with open("auth.json", "r") as f:
             return json.load(f)
 
     def search(self, subreddit, flair, **kwargs):
-        for submission in self._psaw.search_submissions(subreddit=subreddit, **kwargs):
+        for submission in self.psaw.search_submissions(subreddit=subreddit, **kwargs):
             if flair is not None and len(flair.strip()) > 0:
                 if submission.link_flair_text == flair:
                     yield submission

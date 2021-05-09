@@ -390,13 +390,27 @@ class MainWindow(QMainWindow):
                 # Therefore, the fancier score querying is only available if hide_seen
 
                 cur_timestamp = time.time()
+                three_months = 60 * 60 * 24 * 30 * 3  # approx 3 months in seconds
 
-                for submission in self.api.search(subreddit, flair):
-                    if cur_timestamp - submission.created < 60 * 60 * 24 * 30 * 3:  # approx 3 months
-                        yield submission
-                    else:
-                        break
+                # Assuming posts are received from the pushshift API in chronological order, and
+                # list order is retained when saving config,
+                # can cut out this first (slow) section if the last seen_ids value is from longer than a month ago
+                skip_local_filtering_step = False
+                seen_ids = core.config.get("seen_ids", [])
+                if len(seen_ids) > 0:
+                    last_seen_submission = self.api.praw.submission(id=seen_ids[-1])
+                    if cur_timestamp - last_seen_submission.created >= three_months:
+                        skip_local_filtering_step = True
+                        print("Skipped local filtering step!")
 
+                if not skip_local_filtering_step:
+                    for submission in self.api.search(subreddit, flair):
+                        if cur_timestamp - submission.created < three_months:
+                            yield submission
+                        else:
+                            break
+
+                print("Switching to server-side score filtering! Post loading speeds should now increase!")
                 for submission in self.api.search(subreddit, flair, score=f">{score}"):
                     yield submission
             else:
