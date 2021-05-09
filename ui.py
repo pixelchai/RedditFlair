@@ -259,6 +259,20 @@ class MainWindow(QMainWindow):
         self.edit_flair = QLineEdit(self.panel_top)
         self.layout_top.addWidget(self.edit_flair)
 
+        self.label_score = QLabel(self.panel_top, text="Min Score: ")
+        self.layout_top.addWidget(self.label_score)
+
+        self.spin_score = QSpinBox(self.panel_top)
+        self.spin_score.setMinimum(0)
+        self.spin_score.setMaximum(999999999)
+        self.spin_score.setSingleStep(1)
+        spin_size_policy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        spin_size_policy.setHorizontalStretch(0)
+        spin_size_policy.setVerticalStretch(0)
+        spin_size_policy.setHeightForWidth(self.spin_score.sizePolicy().hasHeightForWidth())
+        self.spin_score.setSizePolicy(spin_size_policy)
+        self.layout_top.addWidget(self.spin_score)
+
         self.btn_go = QPushButton(self.panel_top, text="Go")
         self.layout_top.addWidget(self.btn_go)
 
@@ -339,6 +353,7 @@ class MainWindow(QMainWindow):
 
         # load config
         try:
+            self.spin_score.setValue(core.config.get("prev_score", 1))
             self.edit_subreddit.setText(core.config["prev_subreddit"])
             self.edit_flair.setText(core.config["prev_flair"])
             self.btn_go.click()
@@ -357,9 +372,11 @@ class MainWindow(QMainWindow):
 
         subreddit = self.edit_subreddit.text()
         flair = self.edit_flair.text()
+        score = self.spin_score.value()
 
         core.config["prev_subreddit"] = subreddit
         core.config["prev_flair"] = flair
+        core.config["prev_score"] = score
 
         for submission in self.api.search(
             subreddit,
@@ -367,6 +384,10 @@ class MainWindow(QMainWindow):
         ):
             # filter out non-image posts
             if submission.is_self or submission.media is not None:
+                continue
+
+            # filter out by score
+            if submission.score < score:
                 continue
 
             # filter out seen if hide_seen option is checked
