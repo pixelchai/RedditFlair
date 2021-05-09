@@ -213,7 +213,12 @@ class SubmissionLoader(QObject):
             while not self.shown and not self.quit_flag:
                 time.sleep(0.1)
 
-        self._load_url(self.submission.url)
+        try:
+            self._load_url(self.submission.url)
+        except:
+            print("Could not load image from submission url: {}".format(self.submission.url))
+            traceback.print_exc()
+
         self.done.emit()
 
 class MainWindow(QMainWindow):
@@ -416,18 +421,23 @@ class MainWindow(QMainWindow):
         if submission_loader is not None:
             submission_loader.shown = True
 
-            # update seen_ids
-            seen_ids = core.config.get("seen_ids", [])
-            if submission_loader.submission.id not in seen_ids:
-                seen_ids.append(submission_loader.submission.id)
-            core.config.set("seen_ids", seen_ids)
+            try:
+                # update seen_ids
+                seen_ids = core.config.get("seen_ids", [])
+                if submission_loader.submission.id not in seen_ids:
+                    seen_ids.append(submission_loader.submission.id)
+                core.config.set("seen_ids", seen_ids)
 
-            self._update_im(submission_loader.im)
-            submission_loader.loaded.connect(self._update_im)
+                self._update_im(submission_loader.im)
+                submission_loader.loaded.connect(self._update_im)
 
-            self.label_title.setText(submission_loader.title)
-            self.label_score.setText(core.human_number(submission_loader.submission.score))
-            self.label_no_display.setText(f"#{self.post_list.get_no():05d}")
+                self.label_title.setText(submission_loader.title)
+                self.label_score.setText(core.human_number(submission_loader.submission.score))
+                self.label_no_display.setText(f"#{self.post_list.get_no():05d}")
+            except:
+                print("Submission loader fatal exception! Skipping!")
+                traceback.print_exc()
+                self._skip_callback()
 
     def _btn_next_clicked(self):
         self._skip_callback = self._btn_next_clicked
