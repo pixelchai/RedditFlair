@@ -1,6 +1,7 @@
 .idea/
 dev.py
 notes.txt
+bak/
 
 auth.json
 auth.dev.json

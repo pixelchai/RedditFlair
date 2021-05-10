@@ -247,7 +247,7 @@ class MainWindow(QMainWindow):
         self.panel_top.setSizePolicy(sizePolicy)
         self.layout_top = QHBoxLayout(self.panel_top)
 
-        self.label_subreddit = QLabel(self.panel_top, text="Subreddit: ")
+        self.label_subreddit = QLabel(self.panel_top, text="Subreddit(s): ")
         self.layout_top.addWidget(self.label_subreddit)
 
         self.edit_subreddit = QLineEdit(self.panel_top)
