@@ -379,7 +379,7 @@ class MainWindow(QMainWindow):
         core.config["prev_score"] = score
 
         def _raw_generator():
-            if core.config.get("hide_seen", False) and score > 0:
+            if core.config.get("server_side_filtering", False) and core.config.get("hide_seen", False) and score > 0:
                 # fancier and faster score querying by querying the pushshift API for score directly
                 # however, when filtering by score, the API only gives results >2months ago*
                 # therefore, score filter client-side for the first 2 months, then use server-side filtering
